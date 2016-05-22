@@ -1,0 +1,91 @@
+---
+title: "Prediction Model Assignment Using Weight Lifting Exercise Dataset"
+output:
+  html_document:
+    keep_md: yes
+  pdf_document: default
+  word_document: default
+---
+
+### This analysis is provided as a course project Week 4, Machine Learning, as part of the Data Science Specialization.
+### Author: James Aloi
+
+## Overview:
+### The objective is to use the Weight Lifting Exercise training data to create a model to predict the manner in which the exercise was performed (5 distinct possibilities).
+
+## The Data 
+### (See reference http://groupware.les.inf.puc-rio.br/har#weight_lifting_exercises#ixzz499wev2rw)
+### Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+### Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. Participants were supervised by an experienced weight lifter to make sure the execution complied to the manner they were supposed to simulate.
+
+## Given:
+### The input data was provided in the following files:
+### Training: pml-training.csv
+### Testing: pml-testing.csv
+
+## Exploratory Analysis:
+### In exploratory observation of the training data, it was found that several columns in the data set had the vast majority of the measurements as NA or blank across all of the samples.  It was decided that these columns would not be used in building the model. The columns used for the model are the following:
+#### roll_belt,pitch_belt,yaw_belt,total_accel_belt,gyros_belt_x,gyros_belt_y,gyros_belt_z,accel_belt_x,accel_belt_y,
+#### accel_belt_z,magnet_belt_x,magnet_belt_y,magnet_belt_z,roll_arm,pitch_arm,yaw_arm,total_accel_arm,gyros_arm_x,
+#### gyros_arm_y,gyros_arm_z,accel_arm_x,accel_arm_y,accel_arm_z,magnet_arm_x,magnet_arm_y,magnet_arm_z,roll_dumbbell,
+#### pitch_dumbbell,yaw_dumbbell,total_accel_dumbbell,gyros_dumbbell_x,gyros_dumbbell_y,gyros_dumbbell_z,accel_dumbbell_x,
+#### accel_dumbbell_y,accel_dumbbell_z,magnet_dumbbell_x,magnet_dumbbell_y,magnet_dumbbell_z,roll_forearm,pitch_forearm,
+#### yaw_forearm,total_accel_forearm,gyros_forearm_x,gyros_forearm_y,gyros_forearm_z,accel_forearm_x,accel_forearm_y,
+#### accel_forearm_z,magnet_forearm_x,magnet_forearm_y,magnet_forearm_z
+
+## Building the Model and Explanation of Cross Validation:
+### I decided to build a random forest model due to its noted accuracy. I split the pml-training.csv data into a training data set (75%) and a validation data set (25%) for measuring the accuracy of the model (i.e. the cross validation which is not based on any of the data used in producing the model), with the plan to use the pml-testing.csv as the testing data set on the final model and provide the predictions. Note that I am using classe as a factor variable.
+```{r }
+library(caret)
+# Read in the file
+inputTraining <- read.csv("pml-training.csv")
+# Create data split and prepare for cross validation
+inTrain <- createDataPartition(inputTraining$classe,p=0.75)[[1]]
+training <- inputTraining[inTrain,]
+validation <- inputTraining[-inTrain,]
+# Factor variables
+training$classe = factor(training$classe)
+validation$classe = factor(validation$classe)
+# Read in validation file
+testing <- read.csv("pml-testing.csv")
+```
+### Here is an exploratory analysis of the distribution of the training data
+```{r fig.cap='Figure 1: Histogram of the Training classe Data'}
+histogram(training$classe, main="Histogram of Training classe Data")
+```
+```{r }
+set.seed(33833)
+# I built the model using this training data set.  I used the validation data to measure the accuracy of the model. 
+rfModel <- train(classe~roll_belt+pitch_belt+yaw_belt+total_accel_belt+gyros_belt_x+gyros_belt_y+gyros_belt_z+accel_belt_x+accel_belt_y+accel_belt_z+magnet_belt_x+magnet_belt_y+magnet_belt_z+roll_arm+pitch_arm+yaw_arm+total_accel_arm+gyros_arm_x+gyros_arm_y+gyros_arm_z+accel_arm_x+accel_arm_y+accel_arm_z+magnet_arm_x+magnet_arm_y+magnet_arm_z+roll_dumbbell+pitch_dumbbell+yaw_dumbbell+total_accel_dumbbell+gyros_dumbbell_x+gyros_dumbbell_y+gyros_dumbbell_z+accel_dumbbell_x+accel_dumbbell_y+accel_dumbbell_z+magnet_dumbbell_x+magnet_dumbbell_y+magnet_dumbbell_z+roll_forearm+pitch_forearm+yaw_forearm+total_accel_forearm+gyros_forearm_x+gyros_forearm_y+gyros_forearm_z+accel_forearm_x+accel_forearm_y+accel_forearm_z+magnet_forearm_x+magnet_forearm_y+magnet_forearm_z,method="rf",data=training)
+
+# Now do the prediction based on the validation dataset
+predrf <- predict(rfModel,validation)
+```
+### Now I look at the accuracy of the model based on the validation data set (i.e. the cross validation)
+```{r }
+cfrf <- confusionMatrix(predrf,validation$classe)
+cfrf$overall
+```
+### In addition, here is a plot of the random forest model Accuracy vs Predictors.
+```{r fig.cap='Figure 2: Random Forest Model vs. Predictors'}
+plot(rfModel, main="Random Forest Model Importance of Predictors")
+```
+### Finally, here is a plot of the random forest model Predictor Importance.
+```{r fig.cap='Figure 3: Random Forest Model Predictor Importance'}
+vi <- varImp(rfModel)
+plot(vi, main="Random Forest Model Predictor Importance")
+```
+
+## Expected Out of Sample Error:
+### The out of sample error is based on the sum of the number of predicted values for classe that did not match the validation value for classe divided by the number of predictions
+```{r }
+sum(predrf != validation$classe)/length(validation$classe)
+```
+
+### Now provide the predictions of the testing data
+```{r }
+predTest <- predict(rfModel,testing)
+predTest
+```
+## Explanation of Choices Made in The Assignment:
+### Due to inability to converge in some test runs, I ruled out the GLM as a possible model.  I decided to use the random forest due to its noted accuracy as taught in the lecture material and in the literature.  Note: I also decided not to use GBM due to the amount of output that came out of the model fitting was way more than the assignment allowed to be included in the project.
